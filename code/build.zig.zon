@@ -1,0 +1,14 @@
+.{
+    .name = .weonsdk,
+    .version = "2.0.0",
+    .fingerprint = 0xa1470fe41a600e96,
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "include",
+        "LICENSE",
+        "README.md",
+    },
+}

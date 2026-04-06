@@ -1,0 +1,23 @@
+# --- Zig-specific ---
+.zig-cache/
+zig-out/
+code/.zig-cache/
+code/zig-out/
+
+# --- Build Artifacts ---
+bin
+
+# --- C/C++ compiled tests ---
+tests/main
+tests/*.o
+
+# --- System & IDE files ---
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.log
+
+# --- Temp & Backup ---
+*.bak
+*.tmp
