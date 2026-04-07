@@ -4,54 +4,84 @@ const abi = @import("abi");
 // ============================================================================
 // ГЛОБАЛЬНОЕ СОСТОЯНИЕ
 // ============================================================================
-// По умолчанию ставим уровень INFO, чтобы не спамить DEBUG-сообщениями.
 var current_log_level: abi.LogLevel = .info;
 
+// ANSI Цвета (Явно указываем тип []const u8, чтобы Zig не ругался)
+const CLR_RESET: []const u8 = "\x1b[0m";
+const CLR_GREY: []const u8 = "\x1b[90m";
+const CLR_CYAN: []const u8 = "\x1b[36m";
+const CLR_GOLD: []const u8 = "\x1b[33m";
+const CLR_RED: []const u8 = "\x1b[31m";
 
 // ============================================================================
 // 1. ВНУТРЕННИЕ ПОМОЩНИКИ
 // ============================================================================
 
-/// Переводим уровень лога в красивую строку с выравниванием по ширине,
-/// чтобы в консоли всё читалось как идеальная таблица.
 fn getLevelString(level: abi.LogLevel) []const u8 {
     return switch (level) {
         .debug => "DEBUG",
-        .info  => "INFO ", // Пробел для красоты
-        .warn  => "WARN ",
-        .err   => "ERROR",
-        .off   => "OFF  ",
-        _      => "UNKWN",
+        .info => "INFO ",
+        .warn => "WARN ",
+        .err => "ERROR",
+        .off => "OFF  ",
+        _ => "UNKWN",
     };
 }
 
+fn getLevelColor(level: abi.LogLevel) []const u8 {
+    return switch (level) {
+        .debug => CLR_GREY,
+        .info => CLR_CYAN,
+        .warn => CLR_GOLD,
+        .err => CLR_RED,
+        else => CLR_RESET,
+    };
+}
 
 // ============================================================================
-// 2. FFI-ФУНКЦИИ (Интерфейс для C/C++ плагинов)
+// 2. FFI-ФУНКЦИИ
 // ============================================================================
 
 fn ffi_set_level(level: abi.LogLevel) callconv(.c) void {
-    // В будущем тут можно добавить атомарную запись (Atomic), 
-    // если уровень логов будут менять из разных потоков, но пока хватит и так.
     current_log_level = level;
 }
 
 fn ffi_print(level: abi.LogLevel, tag: [*:0]const u8, msg: [*:0]const u8) callconv(.c) void {
-    // 1. Проверяем фильтр. Если сообщение ниже нашего порога — игнорируем.
     if (@intFromEnum(level) < @intFromEnum(current_log_level) or current_log_level == .off) {
         return;
     }
 
-    // 2. Превращаем "бесконечные" Си-строки в строгие Zig-срезы (вычисляем длину до нуля)
     const safe_tag = std.mem.span(tag);
     const safe_msg = std.mem.span(msg);
+    const color = getLevelColor(level);
     const level_str = getLevelString(level);
 
-    // 3. Выводим в консоль (std.debug.print пишет в stderr и защищен мьютексом)
-    // Формат: [INFO ] [RENDER] Hello world!
-    std.debug.print("[{s}] [{s}] {s}\n", .{ level_str, safe_tag, safe_msg });
-}
+    // 1. Получаем миллисекунды для дробной части
+    const now_ms = std.time.milliTimestamp();
+    const ms = @mod(now_ms, 1000);
 
+    // 2. Используем C-функции для получения локального времени
+    const c = @cImport({
+        @cInclude("time.h");
+    });
+
+    var raw_time: c.time_t = @intCast(@divFloor(now_ms, 1000));
+    const time_info = c.localtime(&raw_time);
+
+    // 3. Красивый вывод с локальным временем
+    // %H:%M:%S берем из структуры tm
+    std.debug.print("{s}[{:0>2}:{:0>2}:{:0>2}.{:0>3}] [{s}] [{s:<8}] {s}{s}\n", .{
+        color,
+        time_info.*.tm_hour,
+        time_info.*.tm_min,
+        time_info.*.tm_sec,
+        ms,
+        level_str,
+        safe_tag,
+        safe_msg,
+        CLR_RESET,
+    });
+}
 
 // ============================================================================
 // 3. ЭКЗЕМПЛЯР МОДУЛЯ
