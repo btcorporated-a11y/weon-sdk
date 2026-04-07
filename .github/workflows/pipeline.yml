@@ -17,7 +17,7 @@ jobs:
       - name: Setup Zig
         uses: mlugg/setup-zig@v1
         with:
-          version: master
+          version: 0.15.2
 
       - name: Build SDK
         working-directory: ./code
@@ -25,8 +25,7 @@ jobs:
 
       - name: Compile Validation Suite
         run: |
-          gcc tests/validate.c -Iinclude -Lbin/linux-x86_64 -lweon-sdk -ldl -o validate_test
-
+          gcc tests/main.c -Icode/include -Lbin/lib -lweon-sdk -ldl -o validate_test
       - name: Run Integration Tests
         run: |
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/bin/linux-x86_64
