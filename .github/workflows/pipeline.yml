@@ -1,0 +1,32 @@
+name: WeOn SDK CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v1
+        with:
+          version: 0.13.0
+
+      - name: Build SDK
+        run: zig build -Doptimize=ReleaseSafe
+
+      - name: Compile Validation Suite
+        run: |
+          gcc tests/validate.c -Iinclude -Lbin/linux-x86_64 -lweon-sdk -ldl -o validate_test
+
+      - name: Run Integration Tests
+        run: |
+          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/bin/linux-x86_64
+          ./validate_test

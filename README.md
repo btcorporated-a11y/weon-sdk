@@ -1,19 +1,35 @@
+<div align="center">
+
+# WeOn SDK
+**The High-Performance Core for Next-Gen Plugin Systems**
+
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Version: 2.0.0-alpha](https://img.shields.io/badge/Version-2.0.0--alpha-blue)
+![Platform: Linux | Windows | macOS](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-lightgrey)
+![Language: Zig](https://img.shields.io/badge/Language-Zig-orange)
+[![WeOn SDK CI](https://github.com/btcorporated-a11y/weon-sdk/actions/workflows/pipeline.yml/badge.svg)](https://github.com/btcorporated-a11y/weon-sdk/actions/workflows/pipeline.yml)
+
+---
+</div>
+
 <table border="0">
   <tr>
-    <td>
-      <h1>WeOn SDK v2.0.0-alpha</h1>
+    <td width="75%" valign="top">
+      <h3>System Overview</h3>
       <p>
         <b>WeOn SDK</b> is a high-performance core designed for developing modular plugin systems with a focus on ultra-low latency and ABI stability. Written in <b>Zig</b>, it provides C/C++, and Rust developers with a powerful interface for direct memory interaction, leveraging <b>Zero-Copy</b> principles to eliminate data transfer overhead.
       </p>
+      <p>
+        <i>Current Status: <b>v2.0.0-alpha</b> — Ready for early-stage integration and performance profiling.</i>
+      </p>
     </td>
-    <td width="200px" align="center">
-      <img src="assets/logo.jpg" alt="WeOn SDK Logo" width="150">
+    <td width="25%" align="center" valign="middle">
+      <img src="assets/logo.jpg" alt="WeOn SDK Logo" width="180">
     </td>
   </tr>
 </table>
 
 ---
-
 <details>
 <summary>🏗️ <b>Architecture & Core Principles</b> (Click to expand)</summary>
 
