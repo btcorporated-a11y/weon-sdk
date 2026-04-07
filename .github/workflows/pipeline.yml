@@ -20,7 +20,8 @@ jobs:
           version: 0.13.0
 
       - name: Build SDK
-        run: zig build -Doptimize=ReleaseSafe
+        working-directory: ./code
+        run: zig build --prefix ../bin -Dtarget=x86_64-linux-gnu -Doptimize=ReleaseFast
 
       - name: Compile Validation Suite
         run: |
