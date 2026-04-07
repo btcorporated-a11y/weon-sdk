@@ -12,7 +12,7 @@ typedef const struct weon_api_t* (*weon_get_api_fn)();
 typedef void (*weon_shutdown_fn)();
 
 int main() {
-    const char* lib_path = "./bin/linux-x86_64/libweon-sdk.so";
+    const char* lib_path = "./bin/linux-x86_64/weon-sdk.so";
     void* handle = dlopen(lib_path, RTLD_NOW);
     if (!handle) {
         fprintf(stderr, "❌ FATAL: Cannot load %s\n", lib_path);

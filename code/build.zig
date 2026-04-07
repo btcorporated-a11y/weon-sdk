@@ -27,6 +27,12 @@ pub fn build(b: *std.Build) void {
         .linkage = .dynamic,
     });
 
+    lib.out_filename = switch (os_tag) {
+        .windows => "weon-sdk.dll",
+        .macos, .tvos, .watchos, .ios => "weon-sdk.dylib",
+        else => "weon-sdk.so", // Для Linux и остальных Unix-подобных систем
+    };
+
     // 1. Линкуем стандартную C библиотеку
     lib.linkLibC();
 
