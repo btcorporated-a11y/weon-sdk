@@ -3,110 +3,212 @@
 </p>
 
 # WeOn SDK v2.0.0-alpha
-[![Version](https://img.shields.io/badge/version-2.0.0--alpha-blue)](https://github.com/your-repo)
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-linux%20%7C%20windows-lightgrey)]()
 
-[cite_start]**WeOn SDK** — это высокопроизводительное ядро для создания плагинных систем с упором на низкую задержку и строгую стабильность ABI[cite: 9, 20]. [cite_start]Написанное на **Zig**, оно предоставляет разработчикам на C, C++ и Rust безопасный мост для обмена данными без лишнего копирования (Zero-copy)[cite: 1, 77, 91].
+[cite_start]**WeOn SDK** — это высокопроизводительное ядро для разработки плагинных систем с упором на минимальные задержки и стабильность ABI[cite: 10]. [cite_start]Написанное на языке **Zig**, оно предоставляет разработчикам на C/C++ и Rust интерфейс для прямого взаимодействия с памятью без лишних затрат на копирование данных (Zero-Copy)[cite: 10, 11].
 
 ---
 
-## 🚀 Основные возможности
+## 🏗️ Архитектура и принципы работы
 
-* [cite_start]**Zero-Copy архитектура**: Десериализатор строк и сырых данных возвращает прямые указатели в буфер, исключая аллокации[cite: 90, 91, 95].
-* [cite_start]**Высокоскоростная шина (Data Bus)**: Система `Shared Request` позволяет множеству плагинов-писателей безопасно отправлять команды одному хосту-читателю (например, рендереру)[cite: 123, 127].
-* [cite_start]**Умное управление состоянием**: `Shared State` менеджер с поддержкой Fat Pointers (View) обеспечивает безопасный доступ к памяти с проверкой границ[cite: 12, 112, 116].
-* [cite_start]**Строгий порядок байтов**: Все бинарные данные упаковываются в формате **Little Endian** для кросс-платформенной совместимости[cite: 30, 70].
-* [cite_start]**Безопасность типов**: Использование хэшей FNV-1a (64-bit) вместо строк в рантайме для мгновенной идентификации ресурсов[cite: 64, 65, 68].
+### Истинный Zero-Copy
+[cite_start]В отличие от традиционных SDK, которые копируют данные между буферами, WeOn предоставляет плагинам прямой доступ к системной памяти ядра[cite: 7].
 
----
+```mermaid
+graph TD
+    subgraph Standard_Approach [Обычный SDK Медленно]
+        A[Plugin A] -- "Copy Data" --> B[Intermediate Buffer]
+        B -- "Copy Data" --> C[Core]
+        C -- "Copy Data" --> D[Plugin B]
+        style Standard_Approach fill:#2D572C,stroke:#ff0000
+    end
 
-## 🏗 Архитектура API
+    subgraph WeOn_Approach [WeOn SDK Zero-Copy]
+        CoreMemory[(Global Shared Memory)]
+        PA[Plugin A] -- "Direct Access (View)" --> CoreMemory
+        PB[Plugin B] -- "Direct Access (ConstView)" --> CoreMemory
+        style WeOn_Approach fill: #252850,stroke:#00aa00
+    end
+```
 
-[cite_start]Сердце SDK — структура `weon_api_t`, которая предоставляет доступ к трем слоям управления[cite: 4, 26]:
+### Управление владением памятью
+[cite_start]Ядро выступает в роли арбитра: оно выделяет физические блоки RAM и передает плагинам "толстые указатели" (Fat Pointers) в виде структур `View`[cite: 6, 7].
 
-| Слой | Назначение | Ключевые компоненты |
-| :--- | :--- | :--- |
-| **Утилиты** | Базовый инструментарий | [cite_start]Логгер (с уровнями), FNV-1a Хэширование [cite: 21, 63, 68] |
-| **Ресурсы** | Взаимодействие и память | [cite_start]Shared State (переменные), Shared Request (команды) [cite: 22, 23] |
-| **Трансформация** | Бинарная упаковка | [cite_start]Serializer (Writer), Deserializer (Reader) [cite: 24, 25] |
+```mermaid
+sequenceDiagram
+    participant P as Plugin
+    participant C as SDK Core
+    participant RAM as System RAM
 
----
-
-## 🛠 Жизненный цикл плагина
-
-WeOn использует контрактную модель. [cite_start]Каждый плагин должен реализовать интерфейс `PluginInterface`[cite: 28]:
-
-1.  [cite_start]**`on_init`**: Получение доступа к глобальному Core API и регистрация команд[cite: 28].
-2.  [cite_start]**`on_create`**: Инициализация инстанса плагина в конкретном пространстве имен[cite: 28].
-3.  [cite_start]**`on_command`**: Обработка входящих событий через хэши команд[cite: 28].
-4.  [cite_start]**`on_destroy`**: Корректное освобождение ресурсов[cite: 28].
-
----
-
-## 💻 Быстрый старт (C API)
-
-### 1. Инициализация SDK
-```c
-#include "weon/api.h"
-
-int main() {
-    // 1. Инициализируем ядро и аллокаторы
-    if (!weon_sdk_init()) return -1; [cite_start]// [cite: 5, 7]
-
-    // 2. Получаем таблицу функций API
-    const weon_api_t* api = weon_sdk_get_api(); [cite_start]// [cite: 7, 26]
-
-    // 3. Используем инструменты
-    api->log->print(WEON_LOG_INFO, "CORE", "SDK Starter Pack Active!"); [cite_start]// [cite: 21]
+    P->>C: create_var(size: 1024)
+    C->>RAM: Allocate block
+    C-->>P: View { data_ptr, size }
+    Note right of P: Плагин пишет напрямую в RAM <br/> по выданному адресу
     
-    return 0;
-}
-```
-
-### 2. Работа с данными (Serialization)
-```c
-// Создаем писателя на базе выделенного буфера
-weon_writer_t writer = api->serializer->init(my_view); [cite_start]// [cite: 24, 39]
-api->serializer->u32(&writer, 42); [cite_start]// [cite: 24, 42]
-api->serializer->str(&writer, "Hello", 5); [cite_start]// [cite: 24, 50]
-
-if (writer.has_error) {
-    // Обработка переполнения буфера
-}
+    P->>C: update_var()
+    C-->>P: View (Тот же адрес)
+    
+    Note over P, RAM: Никаких промежуточных аллокаций!
+    
+    P->>C: destroy_var()
+    C->>RAM: Free block
+    Note right of P: Указатель становится невалидным
 ```
 
 ---
 
-## 📂 Структура проекта
+## 🛠️ Основные модули
 
-* **`bin/`**: Готовые артефакты для интеграции.
-    * [cite_start]`include/weon/`: Заголовочные файлы C API[cite: 20, 26].
-    * `linux-x86_64/`: Динамические библиотеки `.so`.
-    * `windows-x86_64/`: Библиотеки `.dll` и отладочные символы `.pdb`.
-* **`code/src/`**: Реализация ядра на языке Zig.
-    * [cite_start]`core/`: Логика Shared State и Request менеджеров[cite: 98, 123].
-    * [cite_start]`ffi/`: Определения ABI и контрактов[cite: 9, 28].
-    * [cite_start]`tools/`: Реализация сериализации, хэширования и логов[cite: 29, 55, 64, 70].
-* **`tests/`**: Набор тестов на C для проверки стабильности API.
+### 1. Shared State (Менеджер состояний)
+[cite_start]Позволяет плагинам создавать переменные в общем пространстве имен, доступные другим модулям для чтения[cite: 7]. [cite_start]Безопасность обеспечивается проверкой `owner_id`: только создатель может изменять или удалять свои данные[cite: 16].
+
+```mermaid
+graph TD
+    %% Общие стили для темной темы
+    classDef default fill:#2d2d2d,stroke:#555,color:#eeeeee;
+    classDef core fill:#1a1a1a,stroke:#8833ff,stroke-width:2px,color:#ffffff;
+    classDef logic fill:#333333,stroke:#00e5ff,color:#00e5ff;
+
+    subgraph Plugin_Space [Plugin Context]
+        Data[Native C Struct / Variables]
+    end
+
+    subgraph Core_Memory [SDK Core: Shared State]
+        Buffer[("Allocated RAM Buffer<br/>(Physical Address)")]
+    end
+
+    %% --- WRITING / CREATION ---
+    Data -->|1. Request Allocation| CreateVar[api->state->create_var]
+    CreateVar -->|2. Returns Mutable View| View["weon_view_t {data, size}"]
+    View -->|3. Wrap into Cursor| InitWriter[api->serializer->init]
+    InitWriter -->|4. Active Writer| Writer(weon_writer_t)
+    Writer -->|5. Direct Write| Buffer
+
+    %% --- UPDATING ---
+    Buffer -.->|6. Request Write Access| UpdateVar[api->state->update_var]
+    UpdateVar -.->|7. Returns Mutable View| View 
+
+    %% --- READING ---
+    Buffer -->|8. Request Access| ReadVar[api->state->read_var]
+    ReadVar -->|9. Returns Const View| CView[weon_const_view_t]
+    CView -->|10. Wrap into Cursor| InitReader[api->deserializer->init]
+    InitReader -->|11. Active Reader| Reader(weon_reader_t)
+    Reader -->|12. Zero-Copy Extraction| Result[Decoded Data / Pointers]
+
+    %% Стилизация
+    class Buffer core;
+    class CreateVar,UpdateVar,ReadVar logic;
+    
+    style Buffer fill:#4a148c,stroke:#ce93d8,color:#ffffff
+    style View fill:#004d40,stroke:#4db6ac,color:#80cbc4
+    style CView fill:#4e342e,stroke:#bcaaa4,color:#d7ccc8
+    style Plugin_Space fill:#212121,color:#ffffff
+    style Core_Memory fill:#212121,color:#ffffff
+```
+
+### 2. Data Bus (Shared Request)
+[cite_start]Высокоскоростная шина для передачи потоков команд[cite: 8]. [cite_start]Реализует архитектуру "Много писателей — Один читатель"[cite: 8].
+
+* [cite_start]**Reserve Space**: Плагины запрашивают место под одну команду, ядро атомарно сдвигает внутренний курсор[cite: 8, 17].
+* [cite_start]**Batch Read**: Хост (например, рендерер) считывает все накопленные команды за один вызов[cite: 8, 17].
+
+```mermaid
+graph TD
+    %% Общие стили
+    classDef default fill:#2d2d2d,stroke:#555,color:#eeeeee;
+    classDef host fill:#1a1a1a,stroke:#00e5ff,stroke-width:2px,color:#ffffff;
+    classDef client fill:#1a1a1a,stroke:#ccff00,stroke-width:2px,color:#ffffff;
+    classDef memory fill:#4a148c,stroke:#ce93d8,color:#ffffff;
+
+    subgraph Host_Space [Host / Renderer]
+        Create[api->request->create_buffer]
+        Read[api->request->read_buffer]
+        Clear[api->request->clear_buffer]
+    end
+
+    subgraph Core_Bus [SDK Core: Command Buffer]
+        Handle["Buffer Handle (The Ticket)"]
+        Buffer[("Ring-like Buffer RAM<br/>(Physical Address)")]
+        Cursor["Internal Cursor<br/>(Atomic Shift)"]
+    end
+
+    subgraph Clients [Plugins / Writers]
+        P1[Plugin A]
+        P2[Plugin B]
+        P3[Plugin C]
+    end
+
+    %% Flow: Creation
+    Create -->|1. Allocate Capacity| Buffer
+    Buffer -->|2. Return Ticket| Handle
+
+    %% Flow: Writing
+    P1 & P2 & P3 -->|3. Get Ticket| Handle
+    Handle -->|4. reserve_space| Cursor
+    Cursor -->|5. Shift & Return Offset| P1 & P2 & P3
+    P1 & P2 & P3 -->|6. Direct Memory Write| Buffer
+
+    %% Flow: Consumption
+    Buffer -->|7. Batch Read| Read
+    Read -->|8. Process All Cmds| Clear
+    Clear -->|9. Reset Cursor to 0| Cursor
+
+    %% Стилизация
+    class Create,Read,Clear host;
+    class P1,P2,P3 client;
+    class Buffer memory;
+    
+    style Host_Space fill:#121212,color:#00e5ff,stroke:#00e5ff
+    style Clients fill:#121212,color:#ccff00,stroke:#ccff00
+    style Core_Bus fill:#1a1a1a,color:#ffffff,stroke:#8833ff
+```
 
 ---
 
-## 🔨 Сборка из исходников
+## 📦 Структура проекта
+
+```text
+.
+[cite_start]├── bin/                 # Готовые артефакты (headers, .so, .dll, .lib) [cite: 1]
+[cite_start]├── code/                # Исходный код ядра на Zig [cite: 1, 11]
+[cite_start]│   ├── include/weon/    # Публичные C-заголовки [cite: 10]
+[cite_start]│   └── src/             # Реализация логики [cite: 11]
+├── scripts/             # Скрипты сборки и установки для Linux/Windows
+[cite_start]└── tests/               # Набор интеграционных тестов на C [cite: 12]
+```
+
+---
+
+## 🚀 Быстрый старт
 
 ### Требования
-* **Zig Compiler** (рекомендуется v0.13.0 или выше).
+* **Zig Compiler** (v0.13.0 или выше).
+* **GCC/Clang** (для запуска тестов).
 
-### Команды
-**Для Linux:**
+### Сборка и установка (Linux)
 ```bash
 chmod +x build.sh
 ./build.sh
 ```
+Скрипт автоматически:
+1. [cite_start]Очистит старые сборки[cite: 13].
+2. [cite_start]Скомпилирует SDK под Linux и Windows[cite: 13].
+3. [cite_start]Запустит интеграционные тесты для проверки целостности данных[cite: 13].
+4. [cite_start]Установит SDK в системные пути (`/usr/local/lib/weon`)[cite: 13].
 
-**Для Windows:**
-```cmd
-build.bat
+### Использование в C
+```c
+#include <weon/api.h>
+
+int main() {
+    [cite_start]if (weon_sdk_init()) { // [cite: 11]
+        const weon_api_t* api = weon_sdk_get_api(); [cite_start]// [cite: 11]
+        api->log->print(WEON_LOG_INFO, "APP", "WeOn SDK Ready!"); [cite_start]// [cite: 11, 14]
+    }
+    return 0;
+}
 ```
 
-Скрипты автоматически соберут проект, запустят внутренние тесты и обновят содержимое папки `bin/`.
+---
+
+## 📄 Лицензия
+Проект распространяется под лицензией **MIT**. Подробности в файле [LICENSE].
