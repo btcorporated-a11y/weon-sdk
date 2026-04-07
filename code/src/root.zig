@@ -1,21 +1,24 @@
+//
+// * @file main.zig
+// * @brief SDK Entry Point and Global Initialization
+// * @copyright Copyright (c) 2026 WeOn SDK
+//
+
 const std = @import("std");
 const abi = @import("abi");
 
-// Инструменты
+// Toolset
 const hash_tool = @import("tools/hash.zig");
 const log_tool = @import("tools/log.zig");
 const ser_tool = @import("tools/serializer.zig");
 const deser_tool = @import("tools/deserializer.zig");
 
-// Менеджеры
+// Managers
 const state_manager = @import("core/sharedState.zig");
 const request_manager = @import("core/sharedRequest.zig");
 
-// ============================================================================
-// ГЛОБАЛЬНОЕ СОСТОЯНИЕ
-// ============================================================================
+// --- Global State ---
 
-// Убедись, что здесь нет лишних символов перед var
 var initialized: bool = false;
 
 const GLOBAL_API = abi.CoreApi{
@@ -27,9 +30,7 @@ const GLOBAL_API = abi.CoreApi{
     .deserializer = &deser_tool.api_instance,
 };
 
-// ============================================================================
-// ЭКСПОРТ
-// ============================================================================
+// --- Exported C Interface ---
 
 export fn weon_sdk_init() callconv(.c) bool {
     if (initialized) return true;

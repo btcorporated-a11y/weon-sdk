@@ -1,3 +1,9 @@
+//
+// * @file build.zig
+// * @brief Multi-platform Build System Configuration
+// * @copyright Copyright (c) 2026 WeOn SDK
+//
+
 const std = @import("std");
 
 pub fn build(b: *std.Build) void {
@@ -8,6 +14,8 @@ pub fn build(b: *std.Build) void {
     const os_name = @tagName(os_tag);
     const arch_name = @tagName(target.result.cpu.arch);
     const platform_dir = b.fmt("{s}-{s}", .{ os_name, arch_name });
+
+    // --- Module Definitions ---
 
     const abi_module = b.createModule(.{
         .root_source_file = b.path("src/ffi/abi.zig"),
@@ -21,6 +29,8 @@ pub fn build(b: *std.Build) void {
 
     weon_module.addImport("abi", abi_module);
 
+    // --- Library Configuration ---
+
     const lib = b.addLibrary(.{
         .name = "weon-sdk",
         .root_module = weon_module,
@@ -30,20 +40,19 @@ pub fn build(b: *std.Build) void {
     lib.out_filename = switch (os_tag) {
         .windows => "weon-sdk.dll",
         .macos, .tvos, .watchos, .ios => "weon-sdk.dylib",
-        else => "weon-sdk.so", // Для Linux и остальных Unix-подобных систем
+        else => "weon-sdk.so",
     };
 
-    // 1. Линкуем стандартную C библиотеку
     lib.linkLibC();
 
-    // 2. ФИКС ДЛЯ ARCH LINUX (чтобы не подхватывался текстовый /usr/lib/libc.so)
+    // Linux-specific linker adjustments (Fix for Arch Linux libc.so script issues)
     if (os_tag == .linux) {
-        // Добавляем флаг, чтобы линковщик предпочитал динамические библиотеки с версиями (so.6)
-        // и не пытался линковаться со скриптами в /usr/lib напрямую через -lc
         lib.addLibraryPath(.{ .cwd_relative = "/usr/lib" });
     }
 
     lib.addIncludePath(b.path("include"));
+
+    // --- Artifact Installation ---
 
     b.install_path = "../bin";
 

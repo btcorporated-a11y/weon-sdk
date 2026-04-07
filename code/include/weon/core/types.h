@@ -1,3 +1,11 @@
+/**
+ * @file types.h
+ * @brief Core ABI Definitions and Common Types
+ * * Provides platform-independent macros and base structures for 
+ * memory management and error handling across the WeOn SDK.
+ * * @copyright Copyright (c) 2026 WeOn SDK
+ */
+
 #ifndef WEON_CORE_TYPES_H
 #define WEON_CORE_TYPES_H
 
@@ -5,7 +13,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-// --- ABI макросы (для правильной работы DLL/SO на разных ОС) ---
+// --- ABI Macros (Ensures correct calling conventions across OS) ---
 #if defined(_WIN32) || defined(__CYGWIN__)
     #define WEON_CALL   __cdecl
     #define WEON_EXPORT __declspec(dllexport)
@@ -24,40 +32,45 @@
 extern "C" {
 #endif
 
-// --- МАГИЯ: Forward Declaration ---
-// Говорим компилятору: "Такая структура существует, подробности будут позже"
+// --- Forward Declarations ---
+/** Opaque handle to the main API structure, defined in api.h */
 typedef struct weon_api_t weon_api_t;
 
-// Универсальный тип для хэшей (namespace_id, alias_id, cmd_hash)
+/** Universal 64-bit hash type for IDs, aliases, and commands */
 typedef uint64_t weon_hash_t;
 
-// --- Статусы выполнения ---
+/**
+ * @brief Operation Status Codes
+ */
 typedef enum {
-    WEON_STATUS_OK                = 0,  // Успех
-    WEON_STATUS_ERROR             = 1,  // Общая внутренняя ошибка
-    WEON_STATUS_NOT_SUPPORTED     = 2,  // Операция не поддерживается
-    WEON_STATUS_INVALID_ARGUMENTS = 3,  // Переданы неверные данные или NULL
-    WEON_STATUS_PENDING           = 4,  // В процессе (асинхронно)
-    WEON_STATUS_NOT_FOUND         = 5,  // Объект или буфер не найден
-    WEON_STATUS_ACCESS_DENIED     = 6,  // Отказ в доступе (например, чужой Namespace)
-    WEON_STATUS_VERSION_MISMATCH  = 7   // Несовпадение версий ABI
+    WEON_STATUS_OK                = 0,  /** Operation successful */
+    WEON_STATUS_ERROR             = 1,  /** General internal error */
+    WEON_STATUS_NOT_SUPPORTED     = 2,  /** Feature not implemented or supported */
+    WEON_STATUS_INVALID_ARGUMENTS = 3,  /** Null pointers or out-of-range values */
+    WEON_STATUS_PENDING           = 4,  /** Operation in progress (async) */
+    WEON_STATUS_NOT_FOUND         = 5,  /** Target object or buffer missing */
+    WEON_STATUS_ACCESS_DENIED     = 6,  /** Permission error (e.g., namespace isolation) */
+    WEON_STATUS_VERSION_MISMATCH  = 7   /** Incompatible ABI version */
 } weon_status_t;
 
 /**
- * @brief Универсальное представление памяти для ЗАПИСИ (Mutable View).
- * Если данных нет (ошибка доступа или нехватки памяти), data = NULL, size = 0.
+ * @brief Mutable Memory View (Fat Pointer)
+ * Used for WRITING data. If an error occurs (access denied or OOM), 
+ * data is set to NULL and size to 0.
  */
 typedef struct {
-    uint8_t* data;
-    uint32_t size;
+    uint8_t* data;    /** Pointer to the raw byte array */
+    uint32_t size;    /** Accessible memory size in bytes */
 } weon_view_t;
 
 /**
- * @brief Универсальное представление памяти только для ЧТЕНИЯ (Const View).
+ * @brief Read-Only Memory View (Const Fat Pointer)
+ * Used for READING data. The 'const' qualifier prevents accidental 
+ * modifications at the compiler level.
  */
 typedef struct {
-    const uint8_t* data; // CONST: компилятор не даст изменить эти байты!
-    uint32_t size;
+    const uint8_t* data; /** Pointer to the constant byte array */
+    uint32_t size;       /** Data size in bytes */
 } weon_const_view_t;
 
 #ifdef __cplusplus

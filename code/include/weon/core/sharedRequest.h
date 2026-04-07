@@ -1,66 +1,86 @@
+/**
+ * @file shared_request.h
+ * @brief High-Speed Command Bus (Data Bus)
+ * * Architecture: Many Writers (Plugins) -> One Reader (Host).
+ * Optimized for streaming commands between modules with zero-copy overhead.
+ * * @copyright Copyright (c) 2026 WeOn SDK
+ */
+
 #ifndef WEON_CORE_SHARED_REQUEST_H
 #define WEON_CORE_SHARED_REQUEST_H
 
 #include <stddef.h>
 #include <stdint.h>
+
 #include "types.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// Координаты буфера (для защиты и маршрутизации)
+/**
+ * @brief Buffer Coordinates for routing and security.
+ */
 typedef struct {
-    weon_hash_t requestor_id; // ID плагина
-    weon_hash_t buffer_alias; // Имя буфера (например, HASH("render_queue"))
-    weon_hash_t namespace_id; // Пространство имен
+    weon_hash_t requestor_id; /** Plugin unique identifier */
+    weon_hash_t buffer_alias; /** Buffer name (e.g., HASH("render_queue")) */
+    weon_hash_t namespace_id; /** Target namespace */
 } weon_buffer_req_t;
 
-// Структура-ответ для Пункта 3 (Чтение)
+/**
+ * @brief Buffer Read Result.
+ * Contains a pointer to the command stream and metadata for processing.
+ */
 typedef struct {
-    const void* data;       // Прямой указатель на начало команд (CONST - только чтение!)
-    uint32_t command_count; // Количество актуальных команд за этот кадр
-    uint32_t total_bytes;     // Сколько байт они занимают
+    const void* data;       /** Direct pointer to the start of the command stream (Read-Only) */
+    uint32_t command_count; /** Number of active commands in the current frame */
+    uint32_t total_bytes;   /** Total memory footprint of the commands */
 } weon_buffer_view_t;
 
-// "Билет" на доступ к буферу. Плагин не видит "внутренностей" трубы.
+/** * @brief Opaque handle to a buffer "pipe". 
+ * Plugins interact with this "ticket" without seeing internal implementation.
+ */
 typedef void* weon_buffer_handle_t;
 
 /**
- * @brief Высокоскоростная шина (Data Bus) для потоковой передачи команд.
- * Архитектура: Много писателей (Клиенты) -> Один читатель (Хост).
+ * @brief High-Speed Command Bus Manager.
  */
 typedef struct {
     // ------------------------------------------------------------------------
-    // ПУНКТ 1: Создание (Хост)
+    // STAGE 1: Lifecycle & Access
     // ------------------------------------------------------------------------
-    // Хост создает трубу, но не получает указатель на память, только билет (handle).
+
+    /** Host creates a pipe and receives an opaque handle. */
     weon_buffer_handle_t (WEON_CALL *create_buffer)(const weon_buffer_req_t* req, uint32_t capacity);
     
-    // (Дополнение): Клиент по координатам находит трубу и тоже получает билет.
+    /** Clients find an existing pipe by coordinates to receive their access handle. */
     weon_buffer_handle_t (WEON_CALL *get_buffer)(const weon_buffer_req_t* req);
 
+    // ------------------------------------------------------------------------
+    // STAGE 2: Writing Commands (Client/Plugin)
+    // ------------------------------------------------------------------------
+
+    /** * Allocates space for a single command. The core shifts the internal cursor.
+     * @param cmd_hash Identifier for the specific command type.
+     * @return A View that should be cast to the plugin's specific command struct.
+     */
+    weon_view_t (WEON_CALL *reserve_space)(weon_buffer_handle_t handle, weon_hash_t cmd_hash, uint32_t data_size);
 
     // ------------------------------------------------------------------------
-    // ПУНКТ 2: Запись команд (Клиент)
+    // STAGE 3: Reading & Consumption (Host/Renderer)
     // ------------------------------------------------------------------------
-    // Скрипт или плагин запрашивает память под 1 команду. Ядро сдвигает курсор.
-    // Возвращаем void*, чтобы плагин сразу скастовал это в struct своей команды.
-    weon_view_t (WEON_CALL *reserve_space)(weon_buffer_handle_t handle, weon_hash_t cmd_hash, uint32_t data_size);
-    // ------------------------------------------------------------------------
-    // ПУНКТ 3: Чтение команд (Хост)
-    // ------------------------------------------------------------------------
-    // Рендерер берет все команды разом. Ядро возвращает указатель и счетчик.
+
+    /** Retrieves all commands at once for batch processing. */
     weon_buffer_view_t (WEON_CALL *read_buffer)(weon_buffer_handle_t handle);
     
-    // (Дополнение): Рендерер всё отрисовал -> сбрасывает курсор в 0 для следующего кадра.
+    /** Resets the buffer cursor to zero. Called after processing all commands for the frame. */
     void (WEON_CALL *clear_buffer)(weon_buffer_handle_t handle);
 
+    // ------------------------------------------------------------------------
+    // STAGE 4: Finalization
+    // ------------------------------------------------------------------------
 
-    // ------------------------------------------------------------------------
-    // ПУНКТ 4: Уничтожение (Хост)
-    // ------------------------------------------------------------------------
-    // Полное затирание буфера и освобождение памяти.
+    /** Completely wipes the buffer and releases system memory. */
     weon_status_t (WEON_CALL *destroy_buffer)(const weon_buffer_req_t* req);
 
 } weon_request_manager_t;

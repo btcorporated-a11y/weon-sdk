@@ -1,4 +1,5 @@
 #!/bin/bash
+
 export GREEN=$'\e[32m'
 export RED=$'\e[31m'
 export YELLOW=$'\e[33m'

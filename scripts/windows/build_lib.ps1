@@ -6,10 +6,9 @@ Set-Location "$ScriptDir\..\.."
 Write-Host "${BLUE}${BOLD}🛠  Compiling WeOn SDK for Windows...${NC}"
 
 Set-Location "code"
-# Сборка
+
 zig build --prefix ../bin -Dtarget=x86_64-windows -Doptimize=ReleaseFast
 
-# Синхронизация хедеров
 Write-Host "📂 Syncing headers..."
 $DestInc = "../bin/include/weon"
 if (!(Test-Path $DestInc)) { New-Item -ItemType Directory -Path $DestInc -Force }

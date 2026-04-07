@@ -6,13 +6,26 @@
 
 #include "weon/api.h"
 
-// Типы функций из экспорта ядра
+/**
+ * WeOn SDK Release Validation Suite
+ * * EXIT CODES:
+ * 0: Success - All systems functional.
+ * 1: Linkage Error - Failed to load shared library or find symbols.
+ * 2: Lifecycle Error - SDK initialization failed.
+ * 3: Serialization Error - Writer failed to pack data.
+ * 4: Integrity Error - Data mismatch between Shared State and Deserializer.
+ * 5: Bus Error - Command Buffer (Shared Request) failure.
+ */
+
 typedef bool (*weon_init_fn)();
 typedef const struct weon_api_t* (*weon_get_api_fn)();
 typedef void (*weon_shutdown_fn)();
 
 int main() {
     const char* lib_path = "./bin/linux-x86_64/weon-sdk.so";
+    
+    // --- STAGE 1: Dynamic Linking & Symbol Mapping ---
+    // Objective: Verify that the compiled .so file follows the expected ABI.
     void* handle = dlopen(lib_path, RTLD_NOW);
     if (!handle) {
         fprintf(stderr, "❌ FATAL: Cannot load %s\n", lib_path);
@@ -25,15 +38,22 @@ int main() {
 
     if (!weon_sdk_init || !weon_sdk_get_api) return 1;
 
-    // 1. Инициализация
+    // --- STAGE 2: Lifecycle Initialization ---
+    // Objective: Ensure the Zig-based core can initialize its allocators and managers.
     if (!weon_sdk_init()) {
         fprintf(stderr, "❌ TEST FAILED: SDK Initialization\n");
         return 2;
     }
+
     const struct weon_api_t* api = weon_sdk_get_api();
     api->log->print(WEON_LOG_INFO, "TEST", "--- Starting WeOn SDK Release Validation ---");
 
-    // 2. Тест: Shared State + Serializer + Deserializer
+    // --- STAGE 3: Shared State & Serialization Pipeline ---
+    // Objective: Verify Zero-Copy memory allocation and cross-module data integrity.
+    // 1. Create a persistent variable in the global registry.
+    // 2. Serialize a string into the allocated RAM.
+    // 3. Read it back via a Read-Only ConstView.
+    // 4. Deserializer must return a direct pointer to the original memory.
     weon_state_req_t s_req = { .namespace_id = 0xA, .state_alias = 0xB, .requestor_id = 0xC };
     const char* test_msg = "Release_Candidate_2.0";
     uint32_t msg_len = (uint32_t)strlen(test_msg);
@@ -55,7 +75,8 @@ int main() {
         return 4;
     }
 
-    // 3. Тест: Shared Request (Data Bus)
+    // --- STAGE 4: Command Bus (Shared Request) Functionality ---
+    // Objective: Test atomic cursor shifts and multi-writer buffer logic.
     weon_buffer_req_t b_req = { .namespace_id = 0x1, .buffer_alias = 0x2, .requestor_id = 0x3 };
     weon_buffer_handle_t buf_h = api->request->create_buffer(&b_req, 1024);
     if (!buf_h) {
@@ -63,21 +84,23 @@ int main() {
         return 5;
     }
 
-    // Резервируем место под фиктивную команду (Hash 0xEE, данные 16 байт)
+    // Reserve space for a dummy command (ID: 0xEE, Payload: 16 bytes).
+    // The core must shift the cursor and return a pointer behind a hidden header.
     weon_view_t cmd_v = api->request->reserve_space(buf_h, 0xEE, 16);
     if (cmd_v.data == NULL) {
         fprintf(stderr, "❌ TEST FAILED: Buffer Space Reservation\n");
         return 5;
     }
 
-    // Проверяем чтение буфера
+    // Verify readback metadata (command count and total byte footprint).
     weon_buffer_view_t b_view = api->request->read_buffer(buf_h);
     if (b_view.command_count != 1) {
         fprintf(stderr, "❌ TEST FAILED: Request Readback\n");
         return 5;
     }
 
-    // 4. Финализация
+    // --- STAGE 5: Resource Teardown ---
+    // Objective: Clean exit without memory leaks.
     api->log->print(WEON_LOG_INFO, "TEST", "--- All Systems Green. Ready for Release! ---");
     if (weon_sdk_shutdown) weon_sdk_shutdown();
     dlclose(handle);

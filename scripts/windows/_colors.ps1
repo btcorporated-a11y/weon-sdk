@@ -6,7 +6,6 @@ $BLUE = "$E[34m"
 $BOLD = "$E[1m"
 $NC = "$E[0m"
 
-# Экспортируем в область видимости вызывающего скрипта
 $script:GREEN = $GREEN
 $script:RED = $RED
 $script:YELLOW = $YELLOW

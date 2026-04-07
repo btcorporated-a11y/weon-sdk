@@ -1,13 +1,17 @@
+//
+// * @file abi.zig
+// * @brief Zig-to-C ABI Bindings (The SDK Mirror)
+// * @copyright Copyright (c) 2026 WeOn SDK
+//
+
 const std = @import("std");
 
 // ============================================================================
-// 1. БАЗОВЫЕ ТИПЫ (из types.h)
+// BASE TYPES
 // ============================================================================
 
-/// Универсальный хэш
 pub const Hash = u64;
 
-/// Статусы выполнения (C enum обычно занимает 4 байта, поэтому u32)
 pub const Status = enum(u32) {
     ok = 0,
     err = 1,
@@ -17,10 +21,9 @@ pub const Status = enum(u32) {
     not_found = 5,
     access_denied = 6,
     version_mismatch = 7,
-    _, // Разрешаем другие значения (безопасность для C ABI)
+    _, 
 };
 
-/// Уровни логирования
 pub const LogLevel = enum(u32) {
     debug = 0,
     info = 1,
@@ -30,21 +33,18 @@ pub const LogLevel = enum(u32) {
     _,
 };
 
-/// Универсальный срез памяти для записи
 pub const View = extern struct {
-    data: ?[*]u8, // Указатель на массив байтов (может быть null)
+    data: ?[*]u8,
     size: u32,
 };
 
-/// Универсальный срез памяти для чтения (Строгий CONST)
 pub const ConstView = extern struct {
     data: ?[*]const u8,
     size: u32,
 };
 
-
 // ============================================================================
-// 2. МЕНЕДЖЕРЫ И СТРУКТУРЫ (Shared State & Requests)
+// RESOURCE MANAGEMENT STRUCTURES
 // ============================================================================
 
 pub const StateReq = extern struct {
@@ -60,17 +60,15 @@ pub const BufferReq = extern struct {
 };
 
 pub const BufferView = extern struct {
-    data: ?*const anyopaque, // const void*
+    data: ?*const anyopaque,
     command_count: u32,
-    total_bytes: u32,        // Заменили size_t на u32, как договаривались!
+    total_bytes: u32,
 };
 
-/// Билет на доступ к буферу (Opaque Pointer -> void*)
 pub const BufferHandle = ?*anyopaque;
 
-
 // ============================================================================
-// 3. СЕРИАЛИЗАЦИЯ (Курсоры)
+// SERIALIZATION CURSORS
 // ============================================================================
 
 pub const Writer = extern struct {
@@ -87,10 +85,8 @@ pub const Reader = extern struct {
     has_error: bool,
 };
 
-
 // ============================================================================
-// 4. ИНТЕРФЕЙСЫ МОДУЛЕЙ (Таблицы виртуальных функций - VTables)
-// Обрати внимание: все функции используют callconv(.c)
+// INTERFACE TABLES (VTables)
 // ============================================================================
 
 pub const HashApi = extern struct {
@@ -138,12 +134,10 @@ pub const DeserializerApi = extern struct {
     raw:  *const fn (r: *Reader, out_len: *u32) callconv(.c) ?*const anyopaque,
 };
 
-
 // ============================================================================
-// 5. ГЛАВНЫЙ ЧЕМОДАН (The Core API)
+// CORE API & PLUGIN INTERFACE
 // ============================================================================
 
-/// Это та самая структура, адрес которой мы передадим плагину в on_init
 pub const CoreApi = extern struct {
     hash: *const HashApi,
     log: *const LogApi,
@@ -152,11 +146,6 @@ pub const CoreApi = extern struct {
     serializer: *const SerializerApi,
     deserializer: *const DeserializerApi,
 };
-
-
-// ============================================================================
-// 6. ИНТЕРФЕЙС ПЛАГИНА (То, что Ядро ожидает от DLL плагина)
-// ============================================================================
 
 pub const PluginInitParams = extern struct {
     api: *const CoreApi,
